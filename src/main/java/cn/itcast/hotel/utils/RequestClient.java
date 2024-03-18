@@ -12,7 +12,7 @@ public class RequestClient {
     @Bean
     public RestHighLevelClient client() {
         return new RestHighLevelClient(RestClient.builder(
-                HttpHost.create("http://192.168.7.132:9200")
+                HttpHost.create("http://192.168.7.136:9200")
         ));
     }
 }

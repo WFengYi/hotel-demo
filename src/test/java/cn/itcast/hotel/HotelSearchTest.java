@@ -3,24 +3,25 @@ package cn.itcast.hotel;
 import cn.itcast.hotel.pojo.HotelDoc;
 import com.alibaba.fastjson.JSON;
 import org.apache.http.HttpHost;
-import org.apache.lucene.search.TotalHits;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.index.query.BoolQueryBuilder;
-import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
-import org.elasticsearch.search.aggregations.Aggregation;
 import org.elasticsearch.search.aggregations.AggregationBuilders;
 import org.elasticsearch.search.aggregations.Aggregations;
 import org.elasticsearch.search.aggregations.bucket.terms.Terms;
 import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
 import org.elasticsearch.search.fetch.subphase.highlight.HighlightField;
 import org.elasticsearch.search.sort.SortOrder;
+import org.elasticsearch.search.suggest.Suggest;
+import org.elasticsearch.search.suggest.SuggestBuilder;
+import org.elasticsearch.search.suggest.SuggestBuilders;
+import org.elasticsearch.search.suggest.completion.CompletionSuggestion;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,7 +41,7 @@ public class HotelSearchTest {
         SearchRequest request = new SearchRequest("hotel");
         //2.准备DSL语句
         //3.query
-        request.source().query(QueryBuilders.matchQuery("name","汉庭"));
+        request.source().query(QueryBuilders.matchQuery("name", "汉庭"));
         //3.高亮
         request.source().highlighter(new HighlightBuilder().field("name").requireFieldMatch(false));
         //3.3添加分页
@@ -54,6 +55,7 @@ public class HotelSearchTest {
 
     /**
      * 聚合
+     *
      * @throws IOException
      */
     @Test
@@ -86,7 +88,33 @@ public class HotelSearchTest {
     }
 
 
-
+    /**
+     * 自动补全
+     *
+     * @throws IOException
+     */
+    @Test
+    void testAutoComplete() throws IOException {
+        SearchRequest request = new SearchRequest("hotel");
+        request.source()
+                .suggest(new SuggestBuilder().addSuggestion(
+                        "mySuggestion",
+                        SuggestBuilders.completionSuggestion("suggestion")
+                                .prefix("h")//要自动补全的拼音
+                                .skipDuplicates(true)
+                                .size(10)
+                ));
+        SearchResponse response = client.search(request, RequestOptions.DEFAULT);
+        Suggest suggest = response.getSuggest();
+        CompletionSuggestion suggestion = suggest.getSuggestion("mySuggestion");
+        for (CompletionSuggestion.Entry.Option options : suggestion.getOptions()) {
+            String text = options.getText().string();
+            if (text.contains("/")){
+                text = text.replace("/", "\n");
+            }
+            System.out.println(text);
+        }
+    }
 
     @Test
     void testPageAndSort() throws IOException {
@@ -115,8 +143,8 @@ public class HotelSearchTest {
         //2.1准备booleanQuery
         BoolQueryBuilder boolQuery = QueryBuilders.boolQuery();
         //2.2添加条件
-        boolQuery.must(QueryBuilders.termQuery("city","北京"));
-        boolQuery.mustNot(QueryBuilders.termQuery("city","上海"));
+        boolQuery.must(QueryBuilders.termQuery("city", "北京"));
+        boolQuery.mustNot(QueryBuilders.termQuery("city", "上海"));
         boolQuery.filter(QueryBuilders.rangeQuery("price").lte(200));
         //3.发送请求
         request.source().
@@ -160,6 +188,7 @@ public class HotelSearchTest {
 
     /**
      * 解析响应结果
+     *
      * @param response
      */
     private static void handleResponse(SearchResponse response) {
@@ -178,7 +207,6 @@ public class HotelSearchTest {
     }
 
     /**
-     *
      * @param response
      */
     private void handleHightResponse(SearchResponse response) {
@@ -194,10 +222,10 @@ public class HotelSearchTest {
             HotelDoc hotelDoc = JSON.parseObject(json, HotelDoc.class);
             //获取高亮字段
             Map<String, HighlightField> highlightFields = hit.getHighlightFields();
-            if (!CollectionUtils.isEmpty(highlightFields)){
+            if (!CollectionUtils.isEmpty(highlightFields)) {
                 //获取高亮字段内容
                 HighlightField highlightField = highlightFields.get("name");
-                if (highlightField != null){
+                if (highlightField != null) {
                     //数组下标为0就是name高亮字段的值
                     String name = highlightField.getFragments()[0].toString();
                     //设置name字段内容
@@ -211,7 +239,7 @@ public class HotelSearchTest {
     @BeforeEach
     void setUp() {
         this.client = new RestHighLevelClient(RestClient.builder(
-                HttpHost.create("http://192.168.7.132:9200")
+                HttpHost.create("http://192.168.7.136:9200")
         ));
     }
 

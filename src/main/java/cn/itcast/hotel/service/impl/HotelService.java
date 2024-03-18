@@ -25,6 +25,10 @@ import org.elasticsearch.search.aggregations.Aggregations;
 import org.elasticsearch.search.aggregations.bucket.terms.Terms;
 import org.elasticsearch.search.sort.SortBuilders;
 import org.elasticsearch.search.sort.SortOrder;
+import org.elasticsearch.search.suggest.Suggest;
+import org.elasticsearch.search.suggest.SuggestBuilder;
+import org.elasticsearch.search.suggest.SuggestBuilders;
+import org.elasticsearch.search.suggest.completion.CompletionSuggestion;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -70,12 +74,14 @@ public class HotelService extends ServiceImpl<HotelMapper, Hotel> implements IHo
         }
     }
 
-    @Override
-    public Map<String, List<String>> filters()  {
+
+
+    public Map<String, List<String>> filters(RequestParams params)  {
         try {
             SearchRequest request = new SearchRequest("hotel");
             //2.准备DSL语句
             //2.1 设置size
+            builderBasicQuery(params,request);
             request.source().size(0);
             request.source().aggregation(AggregationBuilders
                     .terms("brandAgg")//参数聚合名字
@@ -107,6 +113,35 @@ public class HotelService extends ServiceImpl<HotelMapper, Hotel> implements IHo
             map.put("城市",cityList);
             map.put("星级",starNameList);
             return map;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public List<String> getSuggestion(String key) {
+        try {
+            SearchRequest request = new SearchRequest("hotel");
+            request.source()
+                    .suggest(new SuggestBuilder().addSuggestion(
+                            "mySuggestion",
+                            SuggestBuilders.completionSuggestion("suggestion")
+                                    .prefix(key)//要自动补全的拼音
+                                    .skipDuplicates(true)
+                                    .size(10)
+                    ));
+            SearchResponse response = client.search(request, RequestOptions.DEFAULT);
+            Suggest suggest = response.getSuggest();
+            CompletionSuggestion suggestion = suggest.getSuggestion("mySuggestion");
+            List<String> suggestionList = new ArrayList<>();
+            for (CompletionSuggestion.Entry.Option options : suggestion.getOptions()) {
+                String text = options.getText().string();
+                if (text.contains("/")){
+                    text = text.replace("/", "\n");
+                }
+                suggestionList.add(text);
+            }
+            return suggestionList;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

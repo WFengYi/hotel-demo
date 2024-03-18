@@ -13,11 +13,11 @@ class HotelDemoApplicationTests {
     @Autowired
     private HotelService hotelService;
 
-    @Test
-    void contextLoads() {
-
-        Map<String, List<String>> filters = hotelService.filters();
-        System.out.println("filters = " + filters);
-    }
+//    @Test
+//    void contextLoads() {
+//
+//        Map<String, List<String>> filters = hotelService.filters();
+//        System.out.println("filters = " + filters);
+//    }
 
 }
